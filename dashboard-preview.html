@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Healthcare Dashboard Preview</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #060B16;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #fff;
+    min-height: 100vh;
+  }
+
+  /* Layout */
+  .app-shell {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+    background: #0A0F1E;
+    padding-bottom: 70px;
+  }
+
+  /* Tab Bar */
+  .tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 430px;
+    background: #0A0F1E;
+    border-top: 1px solid #1E3055;
+    display: flex;
+    padding: 8px 0 12px;
+    z-index: 100;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    color: #4A5A80;
+    transition: color 0.2s;
+  }
+  .tab-item.active { color: #00C7FF; }
+  .tab-item.ai.active { color: #7B61FF; }
+  .tab-icon { font-size: 20px; }
+
+  /* Screens */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* Scrollable content */
+  .scroll-content { overflow-y: auto; }
+
+  /* Header */
+  .dash-header {
+    background: linear-gradient(180deg, #060B16 0%, #0A0F1E 100%);
+    padding: 48px 16px 16px;
+  }
+  .facility-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,199,255,0.12);
+    border: 1px solid rgba(0,199,255,0.3);
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #00C7FF;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+  }
+  .facility-name {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .reporting-period {
+    font-size: 12px;
+    color: #8899BB;
+    margin-bottom: 16px;
+  }
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .health-score-badge {
+    background: linear-gradient(135deg, #00966A, #00E5A0);
+    border-radius: 12px;
+    padding: 8px 16px;
+    text-align: center;
+  }
+  .health-score-value { font-size: 24px; font-weight: 700; }
+  .health-score-label { font-size: 10px; opacity: 0.8; letter-spacing: 0.5px; }
+  .stars { font-size: 18px; color: #FFB547; }
+  .star-label { font-size: 11px; color: #8899BB; margin-top: 2px; }
+
+  /* Section */
+  .section { padding: 0 16px 16px; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .section-icon { font-size: 16px; }
+  .section-title { font-size: 15px; font-weight: 600; }
+  .section-action { margin-left: auto; font-size: 12px; color: #00C7FF; cursor: pointer; }
+
+  /* Alert banners */
+  .alerts-scroll {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .alert-card {
+    flex-shrink: 0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    min-width: 220px;
+    border: 1px solid;
+  }
+  .alert-card.danger { background: #2A000D; border-color: rgba(255,95,126,0.3); }
+  .alert-card.warning { background: #2A1800; border-color: rgba(255,181,71,0.3); }
+  .alert-card.info { background: #001A2A; border-color: rgba(79,155,245,0.3); }
+  .alert-kpi { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+  .alert-card.danger .alert-kpi { color: #FF5F7E; }
+  .alert-card.warning .alert-kpi { color: #FFB547; }
+  .alert-card.info .alert-kpi { color: #4F9BF5; }
+  .alert-msg { font-size: 12px; color: #8899BB; }
+
+  /* KPI Cards */
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .kpi-card {
+    border-radius: 16px;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card.good { background: linear-gradient(135deg, #003D2A, #00966A); }
+  .kpi-card.warning { background: linear-gradient(135deg, #3D2A00, #B07820); }
+  .kpi-card.danger { background: linear-gradient(135deg, #3D0015, #A83050); }
+  .kpi-card.neutral { background: linear-gradient(135deg, #003040, #0085AA); }
+  .kpi-icon { font-size: 20px; margin-bottom: 8px; }
+  .kpi-title { font-size: 11px; color: rgba(255,255,255,0.7); letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 700; line-height: 1; }
+  .kpi-unit { font-size: 14px; font-weight: 400; }
+  .kpi-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 6px;
+    font-size: 11px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 9999px;
+    padding: 2px 8px;
+  }
+  .kpi-sub { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+
+  /* Card */
+  .card {
+    background: linear-gradient(135deg, #0F1B35, #162040);
+    border: 1px solid #1E3055;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-title { font-size: 13px; color: #8899BB; margin-bottom: 12px; }
+
+  /* Hero card */
+  .hero-card {
+    border-radius: 24px;
+    padding: 24px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .hero-card.cyan { background: linear-gradient(135deg, #003040, #0085AA); }
+  .hero-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 8px;
+  }
+  .hero-value { font-size: 48px; font-weight: 700; line-height: 1; }
+  .hero-sub { font-size: 14px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+  .hero-stats {
+    display: flex;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    gap: 0;
+  }
+  .hero-stat { flex: 1; text-align: center; }
+  .hero-stat + .hero-stat { border-left: 1px solid rgba(255,255,255,0.1); }
+  .hero-stat-val { font-size: 18px; font-weight: 700; }
+  .hero-stat-lbl { font-size: 10px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+
+  /* Metric rows */
+  .metric-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #1E3055;
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
+  .metric-label { flex: 1; font-size: 13px; color: #8899BB; }
+  .metric-value { font-size: 14px; font-weight: 600; }
+  .metric-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    margin-left: 8px;
+  }
+  .badge-good { background: rgba(0,229,160,0.15); color: #00E5A0; }
+  .badge-warning { background: rgba(255,181,71,0.15); color: #FFB547; }
+  .badge-danger { background: rgba(255,95,126,0.15); color: #FF5F7E; }
+
+  /* Chart container */
+  .chart-container { position: relative; height: 160px; }
+
+  /* Snapshot grid */
+  .snapshot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .snapshot-item {
+    background: #162040;
+    border: 1px solid #1E3055;
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .snapshot-label { font-size: 10px; color: #4A5A80; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .snapshot-value { font-size: 18px; font-weight: 700; }
+  .snapshot-sub { font-size: 11px; color: #8899BB; margin-top: 2px; }
+
+  /* AI CTA */
+  .ai-cta {
+    background: linear-gradient(135deg, #4E3EA8, #7B61FF);
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 16px 16px;
+    cursor: pointer;
+  }
+  .ai-cta-icon { font-size: 32px; }
+  .ai-cta-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .ai-cta-sub { font-size: 12px; color: rgba(255,255,255,0.7); }
+  .ai-cta-arrow { margin-left: auto; font-size: 20px; opacity: 0.7; }
+
+  /* Payer legend */
+  .payer-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .payer-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .payer-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8899BB; }
+  .payer-pct { color: #fff; font-weight: 600; }
+
+  /* Bar comparison rows */
+  .hppd-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .hppd-table th { color: #4A5A80; text-align: left; padding: 6px 0; border-bottom: 1px solid #1E3055; }
+  .hppd-table td { padding: 8px 0; border-bottom: 1px solid #131E3A; }
+  .hppd-table tr:last-child td { border-bottom: none; }
+
+  /* Aging bars */
+  .aging-bar-wrap { margin-bottom: 10px; }
+  .aging-bar-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .aging-bar-label span:first-child { color: #8899BB; }
+  .aging-bar-track { height: 8px; background: #1E3055; border-radius: 9999px; overflow: hidden; }
+  .aging-bar-fill { height: 100%; border-radius: 9999px; }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid #1E3055; margin: 4px 0; }
+
+  /* Compliance check rows */
+  .compliance-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #1E3055;
+    font-size: 13px;
+  }
+  .compliance-row:last-child { border-bottom: none; }
+  .check-icon { font-size: 18px; }
+
+  /* Screen title */
+  .screen-header {
+    background: linear-gradient(180deg, #060B16 0%, #0A0F1E 100%);
+    padding: 48px 16px 16px;
+  }
+  .screen-title { font-size: 22px; font-weight: 700; }
+  .screen-sub { font-size: 13px; color: #8899BB; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ===== DASHBOARD SCREEN ===== -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="dash-header">
+      <div class="facility-badge">🏥 SNF · 120 Beds</div>
+      <div class="facility-name">Sunrise Gardens SNF</div>
+      <div class="reporting-period">Reporting Period: January 2025 (MTD)</div>
+      <div class="header-row">
+        <div>
+          <div class="stars">★★★★☆</div>
+          <div class="star-label">CMS 4-Star Rating</div>
+        </div>
+        <div class="health-score-badge">
+          <div class="health-score-value">82</div>
+          <div class="health-score-label">HEALTH SCORE</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">🔔</span>
+        <span class="section-title">Active Alerts</span>
+        <span class="section-action">View All</span>
+      </div>
+      <div class="alerts-scroll">
+        <div class="alert-card warning">
+          <div class="alert-kpi">Revenue</div>
+          <div class="alert-msg">Monthly revenue 3.4% below budget ($985K vs $1.02M)</div>
+        </div>
+        <div class="alert-card warning">
+          <div class="alert-kpi">Labor</div>
+          <div class="alert-msg">Agency spend elevated at 7.2% of total labor costs</div>
+        </div>
+        <div class="alert-card warning">
+          <div class="alert-kpi">AR & Collections</div>
+          <div class="alert-msg">DSO of 32.4 days exceeds 30-day target by 2.4 days</div>
+        </div>
+        <div class="alert-card info">
+          <div class="alert-kpi">Census</div>
+          <div class="alert-msg">Occupancy at 90% — 12 available beds, strong payer mix</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Grid -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📊</span>
+        <span class="section-title">Key Performance Indicators</span>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card good">
+          <div class="kpi-icon">🛏️</div>
+          <div class="kpi-title">OCCUPANCY RATE</div>
+          <div class="kpi-value">90.0<span class="kpi-unit">%</span></div>
+          <div class="kpi-change">▲ +1.2%</div>
+          <div class="kpi-sub">108 / 120 beds</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-icon">💰</div>
+          <div class="kpi-title">MONTHLY REVENUE</div>
+          <div class="kpi-value">$985<span class="kpi-unit">K</span></div>
+          <div class="kpi-change">▼ -3.4%</div>
+          <div class="kpi-sub">vs $1.02M budget</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-icon">⏱️</div>
+          <div class="kpi-title">TOTAL HPPD</div>
+          <div class="kpi-value">3.89<span class="kpi-unit"> hrs</span></div>
+          <div class="kpi-change">▲ +0.15</div>
+          <div class="kpi-sub">vs 3.74 budget</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-icon">📅</div>
+          <div class="kpi-title">OVERALL DSO</div>
+          <div class="kpi-value">32.4<span class="kpi-unit"> d</span></div>
+          <div class="kpi-change">▲ +2.4d</div>
+          <div class="kpi-sub">vs 30-day target</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Occupancy Trend Chart -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">📈</span>
+        <span class="section-title">30-Day Occupancy Trend</span>
+      </div>
+      <div class="card" style="padding:16px 8px;">
+        <div class="chart-container">
+          <canvas id="occupancyChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Facility Snapshot -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-icon">🏢</span>
+        <span class="section-title">Facility Snapshot</span>
+      </div>
+      <div class="snapshot-grid">
+        <div class="snapshot-item">
+          <div class="snapshot-label">Licensed Beds</div>
+          <div class="snapshot-value">120</div>
+          <div class="snapshot-sub">120 certified</div>
+        </div>
+        <div class="snapshot-item">
+          <div class="snapshot-label">Census (ADC)</div>
+          <div class="snapshot-value" style="color:#00C7FF;">108.3</div>
+          <div class="snapshot-sub">Budget: 110.0</div>
+        </div>
+        <div class="snapshot-item">
+          <div class="snapshot-label">Top Payer</div>
+          <div class="snapshot-value" style="color:#A78BFA;">Medicaid</div>
+          <div class="snapshot-sub">48.1% of census</div>
+        </div>
+        <div class="snapshot-item">
+          <div class="snapshot-label">Labor %</div>
+          <div class="snapshot-value" style="color:#FFB547;">52.7%</div>
+          <div class="snapshot-sub">of gross revenue</div>
+        </div>
+        <div class="snapshot-item">
+          <div class="snapshot-label">Collections</div>
+          <div class="snapshot-value" style="color:#00E5A0;">97.2%</div>
+          <div class="snapshot-sub">1.8% bad debt</div>
+        </div>
+        <div class="snapshot-item">
+          <div class="snapshot-label">Total AR</div>
+          <div class="snapshot-value">$2.85M</div>
+          <div class="snapshot-sub">DSO: 32.4 days</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI CTA -->
+    <div class="ai-cta">
+      <div class="ai-cta-icon">✨</div>
+      <div>
+        <div class="ai-cta-title">AI Advisor</div>
+        <div class="ai-cta-sub">Ask questions about your facility's performance</div>
+      </div>
+      <div class="ai-cta-arrow">›</div>
+    </div>
+  </div>
+
+  <!-- ===== CENSUS SCREEN ===== -->
+  <div class="screen" id="screen-census">
+    <div class="screen-header">
+      <div class="screen-title">Census</div>
+      <div class="screen-sub">Occupancy & Payer Mix · January 2025</div>
+    </div>
+    <div class="section">
+      <div class="hero-card cyan">
+        <div class="hero-label">Occupancy Rate</div>
+        <div class="hero-value">90.0%</div>
+        <div class="hero-sub">108 occupied / 120 licensed beds</div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-val">108.3</div>
+            <div class="hero-stat-lbl">Actual ADC</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val">110.0</div>
+            <div class="hero-stat-lbl">Budget ADC</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val" style="color:#FFB547;">-1.5%</div>
+            <div class="hero-stat-lbl">vs Budget</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADC Trend -->
+      <div class="card">
+        <div class="card-title">30-Day ADC Trend</div>
+        <div class="chart-container">
+          <canvas id="adcChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Payer Mix Pie -->
+      <div class="card">
+        <div class="card-title">Payer Mix Distribution</div>
+        <div style="height:180px; position:relative;">
+          <canvas id="payerPieChart"></canvas>
+        </div>
+        <div class="payer-legend">
+          <div class="payer-item"><div class="payer-dot" style="background:#4F9BF5;"></div>Medicare <span class="payer-pct">25.9%</span></div>
+          <div class="payer-item"><div class="payer-dot" style="background:#A78BFA;"></div>Medicaid <span class="payer-pct">48.1%</span></div>
+          <div class="payer-item"><div class="payer-dot" style="background:#34D399;"></div>Private Pay <span class="payer-pct">12.0%</span></div>
+          <div class="payer-item"><div class="payer-dot" style="background:#FB923C;"></div>Managed Care <span class="payer-pct">13.9%</span></div>
+        </div>
+      </div>
+
+      <!-- Payer Detail -->
+      <div class="card">
+        <div class="card-title">Payer Detail</div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#4F9BF5;"></div>
+          <div class="metric-label">Medicare Part A</div>
+          <div class="metric-value">28 beds</div>
+          <span class="metric-badge badge-good">$550/day</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#A78BFA;"></div>
+          <div class="metric-label">Medicaid</div>
+          <div class="metric-value">52 beds</div>
+          <span class="metric-badge badge-warning">$185/day</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#34D399;"></div>
+          <div class="metric-label">Private Pay</div>
+          <div class="metric-value">13 beds</div>
+          <span class="metric-badge badge-good">$320/day</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#FB923C;"></div>
+          <div class="metric-label">Managed Care</div>
+          <div class="metric-value">15 beds</div>
+          <span class="metric-badge badge-good">$450/day</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== REVENUE SCREEN ===== -->
+  <div class="screen" id="screen-revenue">
+    <div class="screen-header">
+      <div class="screen-title">Revenue</div>
+      <div class="screen-sub">Financial Performance · January 2025</div>
+    </div>
+    <div class="section">
+      <div class="hero-card" style="background:linear-gradient(135deg,#3D2A00,#B07820);">
+        <div class="hero-label">Monthly Gross Revenue</div>
+        <div class="hero-value">$985,420</div>
+        <div class="hero-sub">▼ 3.4% below budget</div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-val">$304.80</div>
+            <div class="hero-stat-lbl">RPPD</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val" style="color:#00E5A0;">97.2%</div>
+            <div class="hero-stat-lbl">Collection</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val">$1.02M</div>
+            <div class="hero-stat-lbl">Budget</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 12-Month Revenue Trend -->
+      <div class="card">
+        <div class="card-title">12-Month Revenue Trend ($K)</div>
+        <div class="chart-container">
+          <canvas id="revenueChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Per Diem by Payer -->
+      <div class="card">
+        <div class="card-title">Per Diem Rate by Payer</div>
+        <div class="chart-container">
+          <canvas id="perDiemChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Revenue by Payer -->
+      <div class="card">
+        <div class="card-title">Revenue by Payer</div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#4F9BF5;"></div>
+          <div class="metric-label">Medicare Part A</div>
+          <div class="metric-value">$442,200</div>
+          <span class="metric-badge badge-good">44.9%</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#A78BFA;"></div>
+          <div class="metric-label">Medicaid</div>
+          <div class="metric-value">$290,680</div>
+          <span class="metric-badge badge-warning">29.5%</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#34D399;"></div>
+          <div class="metric-label">Private Pay</div>
+          <div class="metric-value">$124,800</div>
+          <span class="metric-badge badge-good">12.7%</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#FB923C;"></div>
+          <div class="metric-label">Managed Care</div>
+          <div class="metric-value">$202,500</div>
+          <span class="metric-badge badge-good">20.6%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LABOR SCREEN ===== -->
+  <div class="screen" id="screen-labor">
+    <div class="screen-header">
+      <div class="screen-title">Labor</div>
+      <div class="screen-sub">Staffing & Compliance · January 2025</div>
+    </div>
+    <div class="section">
+      <div class="hero-card" style="background:linear-gradient(135deg,#3D2A00,#B07820);">
+        <div class="hero-label">Total Labor Cost</div>
+        <div class="hero-value">$519,800</div>
+        <div class="hero-sub">52.7% of gross revenue</div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-val">86.4</div>
+            <div class="hero-stat-lbl">Total FTEs</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val" style="color:#FFB547;">6.2</div>
+            <div class="hero-stat-lbl">Agency FTEs</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val" style="color:#FFB547;">42%</div>
+            <div class="hero-stat-lbl">Turnover</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CMS Compliance -->
+      <div class="card">
+        <div class="card-title">CMS Staffing Compliance</div>
+        <div class="compliance-row">
+          <span class="check-icon">✅</span>
+          <div>
+            <div style="font-size:13px;">Total HPPD ≥ 3.48</div>
+            <div style="font-size:11px;color:#8899BB;">Actual: 3.89 hrs (+0.41)</div>
+          </div>
+        </div>
+        <div class="compliance-row">
+          <span class="check-icon">✅</span>
+          <div>
+            <div style="font-size:13px;">RN HPPD ≥ 0.55</div>
+            <div style="font-size:11px;color:#8899BB;">Actual: 0.62 hrs (+0.07)</div>
+          </div>
+        </div>
+        <div class="compliance-row">
+          <span class="check-icon">✅</span>
+          <div>
+            <div style="font-size:13px;">RN on Every Shift</div>
+            <div style="font-size:11px;color:#8899BB;">All shifts covered</div>
+          </div>
+        </div>
+        <div class="compliance-row">
+          <span class="check-icon">✅</span>
+          <div>
+            <div style="font-size:13px;">PBJ Submitted</div>
+            <div style="font-size:11px;color:#8899BB;">Current quarter filed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HPPD by Role Chart -->
+      <div class="card">
+        <div class="card-title">HPPD by Staff Type</div>
+        <div class="chart-container">
+          <canvas id="hppdChart"></canvas>
+        </div>
+      </div>
+
+      <!-- HPPD Table -->
+      <div class="card">
+        <div class="card-title">HPPD Detail</div>
+        <table class="hppd-table">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Actual</th>
+              <th>Budget</th>
+              <th>CMS Min</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:#4F9BF5;">RN</td>
+              <td style="color:#00E5A0;">0.62</td>
+              <td style="color:#8899BB;">0.60</td>
+              <td style="color:#4A5A80;">0.55</td>
+            </tr>
+            <tr>
+              <td style="color:#A78BFA;">LPN</td>
+              <td>0.78</td>
+              <td style="color:#8899BB;">0.76</td>
+              <td style="color:#4A5A80;">—</td>
+            </tr>
+            <tr>
+              <td style="color:#34D399;">CNA</td>
+              <td>2.17</td>
+              <td style="color:#8899BB;">2.10</td>
+              <td style="color:#4A5A80;">2.45</td>
+            </tr>
+            <tr>
+              <td style="color:#FB923C;">Therapy</td>
+              <td>0.92</td>
+              <td style="color:#8899BB;">0.90</td>
+              <td style="color:#4A5A80;">—</td>
+            </tr>
+            <tr style="border-top:1px solid #253A65;">
+              <td style="font-weight:700;">Total</td>
+              <td style="font-weight:700;color:#FFB547;">3.89</td>
+              <td style="color:#8899BB;">3.74</td>
+              <td style="color:#4A5A80;">3.48</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AR SCREEN ===== -->
+  <div class="screen" id="screen-ar">
+    <div class="screen-header">
+      <div class="screen-title">AR & Collections</div>
+      <div class="screen-sub">Accounts Receivable · January 2025</div>
+    </div>
+    <div class="section">
+      <div class="hero-card cyan">
+        <div class="hero-label">Total AR Balance</div>
+        <div class="hero-value">$2.85M</div>
+        <div class="hero-sub">DSO 32.4 days (target: 30)</div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-val" style="color:#00E5A0;">97.2%</div>
+            <div class="hero-stat-lbl">Collection</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val" style="color:#FFB547;">1.8%</div>
+            <div class="hero-stat-lbl">Bad Debt</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-val">4.9%</div>
+            <div class="hero-stat-lbl">Denial Rate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DSO by Payer -->
+      <div class="card">
+        <div class="card-title">DSO by Payer</div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#4F9BF5;"></div>
+          <div class="metric-label">Medicare Part A</div>
+          <div class="metric-value">18.2 days</div>
+          <span class="metric-badge badge-good">On target</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#A78BFA;"></div>
+          <div class="metric-label">Medicaid</div>
+          <div class="metric-value">42.8 days</div>
+          <span class="metric-badge badge-warning">+12.8d</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#34D399;"></div>
+          <div class="metric-label">Private Pay</div>
+          <div class="metric-value">24.6 days</div>
+          <span class="metric-badge badge-good">On target</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-dot" style="background:#FB923C;"></div>
+          <div class="metric-label">Managed Care</div>
+          <div class="metric-value">28.4 days</div>
+          <span class="metric-badge badge-good">On target</span>
+        </div>
+      </div>
+
+      <!-- AR Aging -->
+      <div class="card">
+        <div class="card-title">AR Aging Buckets</div>
+        <div class="aging-bar-wrap">
+          <div class="aging-bar-label"><span>0–30 days</span><span style="color:#00E5A0;">$1,420,800 · 49.9%</span></div>
+          <div class="aging-bar-track"><div class="aging-bar-fill" style="width:49.9%;background:#00E5A0;"></div></div>
+        </div>
+        <div class="aging-bar-wrap">
+          <div class="aging-bar-label"><span>31–60 days</span><span style="color:#00C7FF;">$680,400 · 23.9%</span></div>
+          <div class="aging-bar-track"><div class="aging-bar-fill" style="width:23.9%;background:#00C7FF;"></div></div>
+        </div>
+        <div class="aging-bar-wrap">
+          <div class="aging-bar-label"><span>61–90 days</span><span style="color:#FFB547;">$382,500 · 13.4%</span></div>
+          <div class="aging-bar-track"><div class="aging-bar-fill" style="width:13.4%;background:#FFB547;"></div></div>
+        </div>
+        <div class="aging-bar-wrap">
+          <div class="aging-bar-label"><span>91–120 days</span><span style="color:#FF5F7E;">$220,100 · 7.7%</span></div>
+          <div class="aging-bar-track"><div class="aging-bar-fill" style="width:7.7%;background:#FF5F7E;"></div></div>
+        </div>
+        <div class="aging-bar-wrap">
+          <div class="aging-bar-label"><span>120+ days</span><span style="color:#FF5F7E;">$143,500 · 5.0%</span></div>
+          <div class="aging-bar-track"><div class="aging-bar-fill" style="width:5%;background:#A83050;"></div></div>
+        </div>
+      </div>
+
+      <!-- Denials -->
+      <div class="card">
+        <div class="card-title">Denial Management</div>
+        <div class="metric-row">
+          <div class="metric-label">Total Denied (MTD)</div>
+          <div class="metric-value">12 claims</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label">Denied Amount</div>
+          <div class="metric-value" style="color:#FF5F7E;">$48,600</div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label">Denial Rate</div>
+          <div class="metric-value">4.9%</div>
+          <span class="metric-badge badge-warning">Watch</span>
+        </div>
+        <div class="metric-row">
+          <div class="metric-label">Overturn Rate</div>
+          <div class="metric-value" style="color:#00E5A0;">67%</div>
+          <span class="metric-badge badge-good">Strong</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AI SCREEN ===== -->
+  <div class="screen" id="screen-ai">
+    <div class="screen-header" style="background:linear-gradient(180deg,#0A0618 0%,#0D0A1E 100%);">
+      <div class="screen-title" style="color:#A78BFA;">✨ AI Advisor</div>
+      <div class="screen-sub">Powered by Claude · Sunrise Gardens SNF</div>
+    </div>
+    <div class="section">
+      <div style="background:linear-gradient(135deg,#1A1040,#2A1A60);border:1px solid rgba(123,97,255,0.3);border-radius:20px;padding:20px;margin-bottom:16px;">
+        <div style="font-size:14px;color:#C4B5FD;margin-bottom:16px;">Hello! I can help you analyze your facility's performance data. What would you like to know?</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="background:rgba(123,97,255,0.15);border:1px solid rgba(123,97,255,0.3);border-radius:12px;padding:10px 14px;font-size:13px;color:#E2D9FF;cursor:pointer;">Why is revenue below budget this month?</div>
+          <div style="background:rgba(123,97,255,0.15);border:1px solid rgba(123,97,255,0.3);border-radius:12px;padding:10px 14px;font-size:13px;color:#E2D9FF;cursor:pointer;">How can we improve our DSO?</div>
+          <div style="background:rgba(123,97,255,0.15);border:1px solid rgba(123,97,255,0.3);border-radius:12px;padding:10px 14px;font-size:13px;color:#E2D9FF;cursor:pointer;">What's driving our agency labor costs?</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input type="text" placeholder="Ask about your dashboard..." style="flex:1;background:#162040;border:1px solid #253A65;border-radius:12px;padding:12px 16px;color:#fff;font-size:14px;outline:none;">
+        <button style="background:linear-gradient(135deg,#4E3EA8,#7B61FF);border:none;border-radius:12px;padding:12px 16px;color:#fff;font-size:18px;cursor:pointer;">›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <nav class="tab-bar">
+    <div class="tab-item active" onclick="switchTab('dashboard', this)">
+      <span class="tab-icon">⊞</span>
+      <span>Dashboard</span>
+    </div>
+    <div class="tab-item" onclick="switchTab('census', this)">
+      <span class="tab-icon">🛏</span>
+      <span>Census</span>
+    </div>
+    <div class="tab-item" onclick="switchTab('revenue', this)">
+      <span class="tab-icon">💵</span>
+      <span>Revenue</span>
+    </div>
+    <div class="tab-item" onclick="switchTab('labor', this)">
+      <span class="tab-icon">👥</span>
+      <span>Labor</span>
+    </div>
+    <div class="tab-item" onclick="switchTab('ar', this)">
+      <span class="tab-icon">📊</span>
+      <span>AR</span>
+    </div>
+    <div class="tab-item ai" onclick="switchTab('ai', this)">
+      <span class="tab-icon">✨</span>
+      <span>AI</span>
+    </div>
+  </nav>
+</div>
+
+<script>
+  // Tab switching
+  function switchTab(name, el) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    el.classList.add('active');
+  }
+
+  // Shared chart defaults
+  const gridColor = 'rgba(30,48,85,0.8)';
+  const textMuted = '#4A5A80';
+  const labelColor = '#8899BB';
+
+  Chart.defaults.color = labelColor;
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  Chart.defaults.font.size = 11;
+
+  // Occupancy trend
+  const oLabels = ['1','3','5','7','9','11','13','15','17','19','21','23','25','27','29','31'];
+  const oData = [102,104,105,107,106,108,109,108,110,109,108,107,109,110,108,108];
+  new Chart(document.getElementById('occupancyChart'), {
+    type: 'line',
+    data: {
+      labels: oLabels,
+      datasets: [{
+        data: oData,
+        borderColor: '#00C7FF',
+        backgroundColor: 'rgba(0,199,255,0.08)',
+        borderWidth: 2,
+        pointRadius: 2,
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' beds' } } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textMuted, maxTicksLimit: 8 } },
+        y: { grid: { color: gridColor }, ticks: { color: textMuted }, min: 95, max: 115 }
+      }
+    }
+  });
+
+  // ADC trend
+  const adcData = [106,107,108,107,109,108,109,110,108,109,107,108,109,108,110,108];
+  new Chart(document.getElementById('adcChart'), {
+    type: 'line',
+    data: {
+      labels: oLabels,
+      datasets: [{
+        data: adcData,
+        borderColor: '#00C7FF',
+        backgroundColor: 'rgba(0,199,255,0.08)',
+        borderWidth: 2,
+        pointRadius: 2,
+        tension: 0.4,
+        fill: true
+      }, {
+        data: Array(16).fill(110),
+        borderColor: 'rgba(255,181,71,0.5)',
+        borderDash: [4,4],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textMuted, maxTicksLimit: 8 } },
+        y: { grid: { color: gridColor }, ticks: { color: textMuted }, min: 100, max: 115 }
+      }
+    }
+  });
+
+  // Payer pie chart
+  new Chart(document.getElementById('payerPieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Medicare', 'Medicaid', 'Private Pay', 'Managed Care'],
+      datasets: [{
+        data: [25.9, 48.1, 12.0, 13.9],
+        backgroundColor: ['#4F9BF5', '#A78BFA', '#34D399', '#FB923C'],
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + '%' } }
+      }
+    }
+  });
+
+  // Revenue trend
+  const revLabels = ['Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'];
+  const revData = [962,978,985,1005,995,1010,1020,1008,995,1015,1002,985];
+  new Chart(document.getElementById('revenueChart'), {
+    type: 'line',
+    data: {
+      labels: revLabels,
+      datasets: [{
+        data: revData,
+        borderColor: '#FFB547',
+        backgroundColor: 'rgba(255,181,71,0.08)',
+        borderWidth: 2,
+        pointRadius: 2,
+        tension: 0.4,
+        fill: true
+      }, {
+        data: Array(12).fill(1020),
+        borderColor: 'rgba(255,255,255,0.2)',
+        borderDash: [4,4],
+        borderWidth: 1.5,
+        pointRadius: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textMuted } },
+        y: { grid: { color: gridColor }, ticks: { color: textMuted, callback: v => '$' + v + 'K' }, min: 940, max: 1050 }
+      }
+    }
+  });
+
+  // Per Diem Bar
+  new Chart(document.getElementById('perDiemChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Medicare', 'Managed Care', 'Private Pay', 'Medicaid'],
+      datasets: [{
+        data: [550, 450, 320, 185],
+        backgroundColor: ['#4F9BF5', '#FB923C', '#34D399', '#A78BFA'],
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: textMuted } },
+        y: { grid: { color: gridColor }, ticks: { color: textMuted, callback: v => '$' + v } }
+      }
+    }
+  });
+
+  // HPPD bar chart
+  new Chart(document.getElementById('hppdChart'), {
+    type: 'bar',
+    data: {
+      labels: ['RN', 'LPN', 'CNA', 'Therapy'],
+      datasets: [{
+        label: 'Actual',
+        data: [0.62, 0.78, 2.17, 0.92],
+        backgroundColor: ['#4F9BF5', '#A78BFA', '#34D399', '#FB923C'],
+        borderRadius: 6
+      }, {
+        label: 'Budget',
+        data: [0.60, 0.76, 2.10, 0.90],
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: labelColor, boxWidth: 10, font: { size: 10 } } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: textMuted } },
+        y: { grid: { color: gridColor }, ticks: { color: textMuted } }
+      }
+    }
+  });
+</script>
+</body>
+</html>
